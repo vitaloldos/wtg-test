@@ -1,0 +1,6 @@
+/src/.env
+/src/mysql/data
+/src/redis/data
+/project/.env
+/project/node_modules
+/project/vendor

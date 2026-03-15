@@ -1,0 +1,101 @@
+version: "3.5"
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: ${PROJECT_NAME}-webserver
+    working_dir: /var/www
+    volumes:
+      - ./../project:/var/www
+      - ./nginx:/etc/nginx/conf.d
+    command: [nginx-debug, '-g', 'daemon off;']
+    ports:
+      #- "${NGINX_PORT}:80"
+      #- "443:443"
+      - "8080:80"
+      #- "5173:5173"
+    links:
+      - php-fpm
+    restart: unless-stopped
+    networks:
+      - internal
+  php-fpm:
+    build:
+      context: ./php-fpm
+      dockerfile: Dockerfile
+      args:
+        WWWGROUP: $WWWGROUP
+    container_name: ${PROJECT_NAME}-php-fpm
+    working_dir: /var/www
+    environment:
+      - PHP_WORKER_INSTALL_BCMATH=true
+    volumes:
+      - ./../project:/var/www
+      - ./php-fpm/php-ini-overrides.ini:/usr/local/etc/php/conf.d/99-overrides.ini
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - internal
+  reverb:
+    container_name: ${PROJECT_NAME}reverb
+    #image: abourtnik/laravel
+    build:
+      context: ./php-fpm
+      dockerfile: Dockerfile
+      args:
+        WWWGROUP: $WWWGROUP
+    working_dir: /var/www
+    command: php artisan reverb:start --port=6001 --debug
+    ports:
+      - "6001:6001"
+    volumes:
+      - ./../project:/var/www
+    networks:
+      - internal
+    depends_on:
+      - php-fpm
+    restart: unless-stopped
+  mysql:
+    image: mysql:8.4
+    container_name: ${PROJECT_NAME}-mysql
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: '${DB_PASSWORD}'
+      MYSQL_DATABASE: '${DB_DATABASE}'
+      MYSQL_USER: '${DB_USERNAME}'
+      MYSQL_PASSWORD: '${DB_PASSWORD}'
+      MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+      #SERVICE_TAGS: dev
+      #SERVICE_NAME: mysql
+    volumes:
+      - ./mysql/data:/var/lib/mysql
+      - ./mysql/my.cnf:/etc/mysql/my.cnf
+    networks:
+      - internal
+  redis:
+    image: 'redis:alpine'
+    container_name: ${PROJECT_NAME}-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    ports:
+      - '${FORWARD_REDIS_PORT:-6379}:6379'
+    build:
+      context: ./redis
+      dockerfile: Dockerfile
+    volumes:
+      - './redis/data:/data'
+    networks:
+      - internal
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+volumes:
+  pg-data:
+    driver: local
+networks:
+  internal:
+    driver: bridge
