@@ -1,5 +1,6 @@
 # wtg-test
 cd src
+
 ducker-compose up
 
 After launch:
@@ -17,3 +18,5 @@ php artisan cache:clear
 php artisan migrate
 
 After relaunch docker-compose
+
+http://localhost:8080/chat
